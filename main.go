@@ -8,5 +8,5 @@ import (
 
 func main() {
 	fmt.Println("Checking hardware ...")
-	check()
+	Compatibility()
 }

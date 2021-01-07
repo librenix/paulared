@@ -12,6 +12,7 @@ require (
 	github.com/keybase/go-kext v0.0.0-20200218013902-e4a86908886a
 	github.com/klauspost/cpuid v1.3.1
 	github.com/klauspost/cpuid/v2 v2.0.3 // indirect
+	github.com/muesli/termenv v0.7.4 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.1.1 // indirect
 	github.com/therecipe/qt v0.0.0-20200904063919-c0c124a5770d // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20201228191146-22fe1fd10b0f
