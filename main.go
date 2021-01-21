@@ -5,7 +5,6 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/librenix/paulared/ui"
 
 	"github.com/mattn/go-isatty"
 )
@@ -29,7 +28,7 @@ func main() {
 		} else {
 			// Start TUI if without any args
 			fmt.Println(os.Args)
-			p := ui.Start()
+			p := SetupUI()
 			if err := p.Start(); err != nil {
 				fmt.Println(err)
 				os.Exit(1)

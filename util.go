@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/imroc/req"
 )
 
@@ -71,7 +70,7 @@ func getLatestRelease(repo string, name string, mime string) {
 	url := "https://api.github.com/repos/" + repo + "/releases/latest"
 	r, err := req.Get(url)
 	if err != nil {
-		color.Red("Failed to get releases\n")
+		log.Fatal("Failed to get releases\n")
 	} else {
 		resp := r.Response()
 		b, _ := ioutil.ReadAll(resp.Body)
@@ -100,6 +99,6 @@ func Download(url string, filename string) {
 	r.ToFile(filename)
 
 	if err != nil {
-		color.Red("Failed to download %s\n", filename)
+		log.Fatal("Failed to download %s\n", filename)
 	}
 }

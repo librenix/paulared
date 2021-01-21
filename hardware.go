@@ -12,10 +12,10 @@ import (
 	"github.com/muesli/termenv"
 )
 
-func ColorString(s string, c string) {
+func ColorString(s string, c string) string {
 	p := termenv.ColorProfile()
 	style := termenv.String(s).Foreground(p.Color(c)).Bold()
-	fmt.Println(style)
+	return fmt.Sprintln(style)
 }
 
 func Detect() *ghw.HostInfo {
@@ -48,27 +48,28 @@ func Detect() *ghw.HostInfo {
 	return host
 }
 
-func Compatibility() {
+func Compatibility() (string, error) {
+	var b strings.Builder
 	hw := Detect()
 
 	// Motherboard
 	//baseboard := hw.Baseboard
 	product := hw.Product
 	vendor := strings.Fields(product.Vendor)[0]
-	ColorString(fmt.Sprintf("Host:\t %s %s\n", vendor, product.Name), "76")
+	b.WriteString(ColorString(fmt.Sprintf("Host:\t %s %s\n", vendor, product.Name), "76"))
 
 	// CPU
 	cpu := hw.CPU
-	ColorString(fmt.Sprintf("CPU:\t %s\n", cpu.Processors[0].Model), "76")
+	b.WriteString(ColorString(fmt.Sprintf("CPU:\t %s\n", cpu.Processors[0].Model), "76"))
 
 	// Memory
 	mem := hw.Memory
 	phys := mem.TotalPhysicalBytes
 	size := phys / 1024 / 1024
 	if size < 2048 {
-		ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "196")
+		b.WriteString(ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "196"))
 	} else {
-		ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "76")
+		b.WriteString(ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "76"))
 	}
 
 	// Hard Disk
@@ -84,7 +85,7 @@ func Compatibility() {
 				} else {
 					unitStr = "GB"
 				}
-				ColorString(fmt.Sprintf("Disk:\t %s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr), "76")
+				b.WriteString(ColorString(fmt.Sprintf("Disk:\t %s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr), "76"))
 			}
 		}
 	} else {
@@ -95,7 +96,7 @@ func Compatibility() {
 	gpu := hw.GPU
 	for _, card := range gpu.GraphicsCards {
 		vendor := strings.Fields(card.DeviceInfo.Vendor.Name)[0]
-		ColorString(fmt.Sprintf("GPU:\t %s %s\n", vendor, card.DeviceInfo.Product.Name), "76")
+		b.WriteString(ColorString(fmt.Sprintf("GPU:\t %s %s\n", vendor, card.DeviceInfo.Product.Name), "76"))
 	}
 
 	// PCI Devices
@@ -130,7 +131,7 @@ func Compatibility() {
 				devStr = "Wireless"
 			}
 			if devStr != "" {
-				ColorString(fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name), "76")
+				b.WriteString(ColorString(fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name), "76"))
 			}
 		}
 	} else {
@@ -149,9 +150,9 @@ func Compatibility() {
 			ColorString(fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc)), "76")
 		} else if desc.Class == 0xe0 && desc.SubClass == 0x01 {
 			if desc.Protocol == 0x01 { // Bluetooth
-				ColorString(fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc)), "76")
+				b.WriteString(ColorString(fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc)), "76"))
 			} else if desc.Protocol == 0x02 { // Wireless
-				ColorString(fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc)), "76")
+				b.WriteString(ColorString(fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc)), "76"))
 			}
 		}
 		return false
@@ -166,4 +167,6 @@ func Compatibility() {
 			d.Close()
 		}
 	}()
+
+	return b.String(), nil
 }
