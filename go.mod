@@ -4,8 +4,7 @@ go 1.15
 
 require (
 	github.com/blacktop/go-lzfse v1.1.12
-	github.com/charmbracelet/bubbles v0.7.5
-	github.com/charmbracelet/bubbletea v0.12.2
+	github.com/charmbracelet/bubbletea v0.12.4
 	github.com/google/gousb v1.1.1
 	github.com/imroc/req v0.3.0
 	github.com/jaypipes/ghw v0.6.1

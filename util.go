@@ -102,3 +102,13 @@ func Download(url string, filename string) {
 		log.Fatal("Failed to download %s\n", filename)
 	}
 }
+
+func LogToFile(path string, prefix string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, err
+	}
+	log.SetOutput(f)
+	log.SetPrefix(prefix)
+	return f, nil
+}

@@ -9,14 +9,31 @@ import (
 	"github.com/google/gousb"
 	"github.com/google/gousb/usbid"
 	"github.com/jaypipes/ghw"
-	"github.com/muesli/termenv"
 )
 
-func ColorString(s string, c string) string {
-	p := termenv.ColorProfile()
-	style := termenv.String(s).Foreground(p.Color(c)).Bold()
-	return fmt.Sprintln(style)
-}
+type Hardware uint
+
+type Result uint
+
+const (
+	CPU Hardware = iota
+	Motherboard
+	Memory
+	Disk
+	GPU
+	Auido
+	Ethernet
+	Wireless
+	Bluetooth
+)
+
+const (
+	Supported Result = iota
+	Unsupported
+	Warning
+	Depreated
+	Unknown
+)
 
 func Detect() *ghw.HostInfo {
 	host, err := ghw.Host()
@@ -48,56 +65,9 @@ func Detect() *ghw.HostInfo {
 	return host
 }
 
-func Compatibility() (string, error) {
-	var b strings.Builder
-	hw := Detect()
-
-	// Motherboard
-	//baseboard := hw.Baseboard
-	product := hw.Product
-	vendor := strings.Fields(product.Vendor)[0]
-	b.WriteString(ColorString(fmt.Sprintf("Host:\t %s %s\n", vendor, product.Name), "76"))
-
-	// CPU
-	cpu := hw.CPU
-	b.WriteString(ColorString(fmt.Sprintf("CPU:\t %s\n", cpu.Processors[0].Model), "76"))
-
-	// Memory
-	mem := hw.Memory
-	phys := mem.TotalPhysicalBytes
-	size := phys / 1024 / 1024
-	if size < 2048 {
-		b.WriteString(ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "196"))
-	} else {
-		b.WriteString(ColorString(fmt.Sprintf("Memory:\t %dMB\n", size), "76"))
-	}
-
-	// Hard Disk
-	block := hw.Block
-	if len(block.Disks) > 0 {
-		for _, disk := range block.Disks {
-			if !disk.IsRemovable && disk.DriveType.String() == "HDD" || disk.DriveType.String() == "SSD" {
-				size := disk.SizeBytes / 1024 / 1024 / 1024
-				unitStr := ""
-				if size > 1024 {
-					size = size / 1024
-					unitStr = "TB"
-				} else {
-					unitStr = "GB"
-				}
-				b.WriteString(ColorString(fmt.Sprintf("Disk:\t %s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr), "76"))
-			}
-		}
-	} else {
-		log.Fatal("Can't find any hard disk\n")
-	}
-
-	// GPU
-	gpu := hw.GPU
-	for _, card := range gpu.GraphicsCards {
-		vendor := strings.Fields(card.DeviceInfo.Vendor.Name)[0]
-		b.WriteString(ColorString(fmt.Sprintf("GPU:\t %s %s\n", vendor, card.DeviceInfo.Product.Name), "76"))
-	}
+func Compatibility(hw Hardware) (Result, error) {
+	var pciDev string
+	info := Detect()
 
 	// PCI Devices
 	pci, err := ghw.PCI()
@@ -120,7 +90,7 @@ func Compatibility() (string, error) {
 			} else if device.Class.ID == "04" && device.Subclass.ID == "03" { // Multimedia controller
 				devStr = "Audio"
 			} else if device.Class.ID == "06" && device.Subclass.ID == "01" { // Southbridge
-				ColorString(fmt.Sprintf("Chipest: "+device.String()+"\n"), "184")
+				pciDev = fmt.Sprintf("Chipest: " + device.String() + "\n")
 			} else if device.Class.ID == "09" { // Input controller
 				if device.Subclass.ID == "00" {
 					devStr = "Keyboard"
@@ -131,11 +101,13 @@ func Compatibility() (string, error) {
 				devStr = "Wireless"
 			}
 			if devStr != "" {
-				b.WriteString(ColorString(fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name), "76"))
+				pciDev = fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name)
 			}
 		}
 	} else {
-		log.Fatal("Could not retrieve pci device\n")
+		err := fmt.Errorf("Could not retrieve pci device\n")
+		log.Fatal(err)
+		return Unknown, err
 	}
 
 	// USB Devices
@@ -143,16 +115,16 @@ func Compatibility() (string, error) {
 	defer ctx.Close()
 	devs, _ := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		if desc.Class == 0x01 && desc.SubClass == 0x01 { // Audio
-			ColorString(fmt.Sprintf("(USB) Audio:\t%s", usbid.Classify(desc)), "76")
+			fmt.Sprintf("(USB) Audio:\t%s", usbid.Classify(desc))
 		} else if desc.Class == 0x02 && desc.SubClass == 0x06 { // Ethernet network
-			ColorString(fmt.Sprintf("(USB) Ethernet:\t%s", usbid.Classify(desc)), "76")
+			fmt.Sprintf("(USB) Ethernet:\t%s", usbid.Classify(desc))
 		} else if desc.Class == 0x0e && desc.SubClass == 0x01 { // Video
-			ColorString(fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc)), "76")
+			fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc))
 		} else if desc.Class == 0xe0 && desc.SubClass == 0x01 {
 			if desc.Protocol == 0x01 { // Bluetooth
-				b.WriteString(ColorString(fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc)), "76"))
+				fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc))
 			} else if desc.Protocol == 0x02 { // Wireless
-				b.WriteString(ColorString(fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc)), "76"))
+				fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc))
 			}
 		}
 		return false
@@ -168,5 +140,75 @@ func Compatibility() (string, error) {
 		}
 	}()
 
-	return b.String(), nil
+	// Motherboard
+	//baseboard := hw.Baseboard
+	switch hw {
+	case Motherboard:
+		product := info.Product
+		vendor := strings.Fields(product.Vendor)[0]
+		fmt.Sprintf("Host:\t %s %s\n", vendor, product.Name)
+		return Supported, nil
+		// CPU
+	case CPU:
+		cpu := info.CPU
+		fmt.Sprintf("CPU:\t %s\n", cpu.Processors[0].Model)
+		return Supported, nil
+	// Memory
+	case Memory:
+		mem := info.Memory
+		phys := mem.TotalPhysicalBytes
+		size := phys / 1024 / 1024
+		if size < 2048 {
+			fmt.Sprintf("Memory:\t %dMB\n", size)
+			return Unsupported, nil
+		} else {
+			fmt.Sprintf("Memory:\t %dMB\n", size)
+			return Supported, nil
+		}
+	// Hard Disk
+	case Disk:
+		block := info.Block
+		if len(block.Disks) > 0 {
+			for _, disk := range block.Disks {
+				size := disk.SizeBytes / 1024 / 1024 / 1024
+				unitStr := ""
+				if !disk.IsRemovable && disk.DriveType.String() == "HDD" || disk.DriveType.String() == "SSD" {
+					if size > 1024 {
+						size = size / 1024
+						unitStr = "TB"
+					} else {
+						unitStr = "GB"
+					}
+				}
+				fmt.Sprintf("Disk:\t %s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr)
+			}
+			return Supported, nil
+		} else {
+			err := fmt.Errorf("Can't find any hard disk\n")
+			log.Fatal(err)
+			return Unknown, err
+		}
+	// GPU
+	case GPU:
+		gpu := info.GPU
+		for _, card := range gpu.GraphicsCards {
+			vendor := strings.Fields(card.DeviceInfo.Vendor.Name)[0]
+			fmt.Sprintf("GPU:\t %s %s\n", vendor, card.DeviceInfo.Product.Name)
+		}
+		return Supported, nil
+	// Ethernet
+	case Ethernet:
+		fmt.Sprintln(pciDev)
+		return Unknown, nil
+	// Wireless
+	case Wireless:
+		fmt.Sprintln(pciDev)
+		return Unknown, nil
+	// Bluetooth
+	case Bluetooth:
+		fmt.Sprintln(pciDev)
+		return Unknown, nil
+	default:
+		return Unknown, nil
+	}
 }
