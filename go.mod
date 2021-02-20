@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.12.4
 	github.com/google/gousb v1.1.1
 	github.com/imroc/req v0.3.0
-	github.com/jaypipes/ghw v0.6.1
+	github.com/jaypipes/ghw v0.7.0
 	github.com/jpillora/overseer v1.1.6 // indirect
 	github.com/keybase/go-kext v0.0.0-20200218013902-e4a86908886a
 	github.com/klauspost/cpuid/v2 v2.0.3 // indirect

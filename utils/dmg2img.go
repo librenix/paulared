@@ -1,11 +1,11 @@
 package utils
 
 import (
-	"compress/bzip2"
-	"compress/zlib"
+	_ "compress/bzip2"
+	_ "compress/zlib"
 
-	"github.com/blacktop/go-lzfse"
-	"howett.net/plist"
+	_ "github.com/blacktop/go-lzfse"
+	_ "howett.net/plist"
 )
 
 func convert(src string, dst string) {

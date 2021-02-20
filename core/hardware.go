@@ -9,6 +9,7 @@ import (
 	"github.com/google/gousb"
 	"github.com/google/gousb/usbid"
 	"github.com/jaypipes/ghw"
+	"github.com/klauspost/cpuid/v2"
 )
 
 type Hardware uint
@@ -70,7 +71,7 @@ func Compatibility(hw Hardware) (Result, error) {
 	info := Detect()
 
 	// PCI Devices
-	pci, err := ghw.PCI()
+	pci, err := info.PCI
 	if err != nil {
 		log.Fatal("Failed to get pci info", err)
 	}
@@ -150,9 +151,58 @@ func Compatibility(hw Hardware) (Result, error) {
 		return Supported, nil
 		// CPU
 	case CPU:
-		cpu := info.CPU
-		fmt.Sprintf("CPU:\t %s\n", cpu.Processors[0].Model)
-		return Supported, nil
+		// Get cpu info from CPUID
+		fmt.Sprintf("CPU:\t %s\n", CPU.BrandName)
+		if !CPU.SSE3() {
+			return Unsupported, nil
+		}
+		if CPU.Intel() {
+			if CPU.Family == 6 {
+				switch (CPU.Model) {
+				// Core
+				case 15: // Conroe (0x0f)
+				case 23: // Penryn (0x17)
+				case 26: case 30: // Clarksfield (0x1a, 0x1e)
+				case 37: case 42: // Sandy Bridge (0x25, 0x2a)
+				case 58: // Ivy Bridge (0x3a)
+				case 60: // Haswell (0x3c)
+				case 61: // Boardwell (0x3d)
+				case 78: // Skylake (Laptop) (0x4e)
+				case 94: // Skylake (Desktop) (0x5e)
+				case 142: // Kaby Lake (Laptop) (0x8e)
+				case 158: // Kaby Lake (Desktop) / Coffee Lake (0x9e)
+				case 102: // Cannon Lake (0x66)
+				case 126: // Ice Lake (0x7e)
+				case 140: case 141: // Tiger Lake (0x8c, 0x8d)
+				case 165: case 166: // Comet Lake (0xa5, 0xa6)
+					return Supported, nil
+				// Xeon
+				case 29: // Penryn (0x1d)
+				case 46: // Nehalem (0x2e)
+				case 44: case 47: // Westmere (0x2c, 0x2f)
+				case 45: // Sandy Bridge-E (0x2d)
+				case 63: // Haswell-E (0x3f)
+				case 85: // Skylake-X/W & Cascade Lake-X/W (0x55)
+					return Warning, nil
+				// Atom (0x1c, 0x26, 0x36, 0x7a, 0x86)
+				case 28: case 38: case 54: case 122: case 134:
+					return Unsupported, nil
+				default:
+					return Unknown, nil
+				}
+			} else {
+				return Unsupported, nil
+			}
+		} else if CPU.AMD() {
+			// For vanilla, only 15h (Family 21+) and above are supported
+			if (CPU.Family >= 21) {
+				return Warning, nil
+			} else {
+				return Unsupported, nil
+			}
+		} else {
+			return Unsupported, nil
+		}
 	// Memory
 	case Memory:
 		mem := info.Memory

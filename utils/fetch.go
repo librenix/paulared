@@ -1,5 +1,5 @@
 package utils
 
 import (
-	"github.com/imroc/req"
+	_ "github.com/imroc/req"
 )
