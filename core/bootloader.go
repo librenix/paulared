@@ -6,8 +6,8 @@ import (
 	"github.com/diskfs/go-diskfs"
 )
 
-var CLOVER_REPO = "CloverHackyColor/CloverBootloader"
 var OPENCORE_REPO = "acidanthera/OpenCorePkg"
+var CLOVER_REPO = "CloverHackyColor/CloverBootloader"
 
 func mkBootloader(device string) {
 	disk, err := diskfs.Open(device)

@@ -17,5 +17,5 @@ func main() {
 	}
 	defer f.Close()
 
-	ui.Setup()
+	ui.SetupUI()
 }
