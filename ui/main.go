@@ -11,7 +11,7 @@ type window struct {
 	*widgets.QApplication
 }
 
-func SetupUI() {
+func NewApp() {
 	// Application
 	app := widgets.NewQApplication(len(os.Args), os.Args)
 	app.SetApplicationDisplayName("paulared")

@@ -20,7 +20,7 @@ func NewWizard(parent widgets.QWidget_ITF, ff core.Qt__WindowType) *Wizard {
 	selectbl := page.NewSelectBLPage(wizard)
 	selectkext := page.NewSelectKextPage(wizard)
 	download := page.NewDownloadPage(wizard)
-	finish := page.NewFinishPage(parent)
+	summary := page.NewSummaryPage(parent)
 
 	wizard.AddPage(intro)
 	wizard.AddPage(detect)
@@ -28,9 +28,9 @@ func NewWizard(parent widgets.QWidget_ITF, ff core.Qt__WindowType) *Wizard {
 	wizard.AddPage(selectbl)
 	wizard.AddPage(selectkext)
 	wizard.AddPage(download)
-	wizard.AddPage(finish)
+	wizard.AddPage(summary)
 
-	wizard.SetOptions(widgets.QWizard__DisabledBackButtonOnLastPage|widgets.QWizard__NoCancelButton)
+	wizard.SetOptions(widgets.QWizard__DisabledBackButtonOnLastPage | widgets.QWizard__NoCancelButton)
 	wizard.SetWizardStyle(widgets.QWizard__MacStyle)
 
 	return wizard
