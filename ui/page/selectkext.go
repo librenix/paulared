@@ -7,17 +7,17 @@ import (
 
 type SelectKextPage struct {
 	*widgets.QWizardPage
-	lv *widgets.QListView
+	lw *widgets.QListWidget
 }
 
 func NewSelectKextPage(parent widgets.QWidget_ITF) *SelectKextPage {
-	lv := widgets.NewQListView(nil)
-	
-	page := &SelectKextPage{widgets.NewQWizardPage(parent), lv}
+	lw := widgets.NewQListWidget(nil)
+
+	page := &SelectKextPage{widgets.NewQWizardPage(parent), lw}
 	page.SetTitle("Select kexts")
 
 	layout := widgets.NewQVBoxLayout2(parent)
-	layout.AddWidget(lv, 0, core.Qt__AlignBaseline)
+	layout.AddWidget(lw, 0, core.Qt__AlignBaseline)
 	page.SetLayout(layout)
 
 	return page

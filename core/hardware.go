@@ -12,21 +12,7 @@ import (
 	"github.com/klauspost/cpuid/v2"
 )
 
-type Hardware uint
 type Processor uint
-type Result uint
-
-const (
-	CPU Hardware = iota
-	Motherboard
-	Memory
-	Disk
-	GPU
-	Auido
-	Ethernet
-	Wireless
-	Bluetooth
-)
 
 const (
 	// Intel
@@ -55,13 +41,20 @@ const (
 	Zen
 )
 
+type Status uint
+
 const (
-	Supported Result = iota
+	Supported Status = iota
 	Unsupported
 	Warning
 	Depreated
 	Unknown
 )
+
+type Result struct {
+	Model  string
+	Status Status
+}
 
 func Detect() *ghw.HostInfo {
 	host, err := ghw.Host()
@@ -93,97 +86,24 @@ func Detect() *ghw.HostInfo {
 	return host
 }
 
-func Compatibility(info ghw.HostInfo, hw Hardware) (Result, error) {
-	var pciDev string
+func Compatibility(i interface{}) Result {
+	var model string
+	status := Unknown
 
-	// PCI Devices
-	pci := info.PCI
-	devices := pci.ListDevices()
-	if len(devices) > 0 {
-		for _, device := range devices {
-			// Class 03 = Display controller (GPU), skip
-			devStr := ""
-			vendor := strings.Fields(device.Vendor.Name)[0]
-			if device.Class.ID == "02" { // Network controller
-				if device.Subclass.ID == "00" {
-					devStr = "Ethernet"
-				} else if device.Subclass.ID == "80" {
-					devStr = "Wireless"
-				}
-			} else if device.Class.ID == "04" && device.Subclass.ID == "03" { // Multimedia controller
-				devStr = "Audio"
-			} else if device.Class.ID == "06" && device.Subclass.ID == "01" { // Southbridge
-				pciDev = fmt.Sprintf("Chipest: " + device.String() + "\n")
-			} else if device.Class.ID == "09" { // Input controller
-				if device.Subclass.ID == "00" {
-					devStr = "Keyboard"
-				} else if device.Subclass.ID == "02" {
-					devStr = "Mouse"
-				}
-			} else if device.Class.ID == "0d" && device.Subclass.ID == "80" { // Network controller
-				devStr = "Wireless"
-			}
-			if devStr != "" {
-				pciDev = fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name)
-			}
-		}
-	} else {
-		err := fmt.Errorf("Could not retrieve pci device\n")
-		log.Fatal(err)
-		return Unknown, err
-	}
-
-	// USB Devices
-	ctx := gousb.NewContext()
-	defer ctx.Close()
-	devs, _ := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
-		if desc.Class == 0x01 && desc.SubClass == 0x01 { // Audio
-			fmt.Sprintf("(USB) Audio:\t%s", usbid.Classify(desc))
-		} else if desc.Class == 0x02 && desc.SubClass == 0x06 { // Ethernet network
-			fmt.Sprintf("(USB) Ethernet:\t%s", usbid.Classify(desc))
-		} else if desc.Class == 0x0e && desc.SubClass == 0x01 { // Video
-			fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc))
-		} else if desc.Class == 0xe0 && desc.SubClass == 0x01 {
-			if desc.Protocol == 0x01 { // Bluetooth
-				fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc))
-			} else if desc.Protocol == 0x02 { // Wireless
-				fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc))
-			}
-		}
-		return false
-	})
-
-	for _, dev := range devs {
-		_ = dev
-	}
-
-	defer func() {
-		for _, d := range devs {
-			d.Close()
-		}
-	}()
-
-	// Motherboard
-	//baseboard := hw.Baseboard
-	switch hw {
-	case Motherboard:
-		product := info.Product
-		vendor := strings.Fields(product.Vendor)[0]
-		fmt.Sprintf("Host:\t %s %s\n", vendor, product.Name)
-		return Supported, nil
-		// CPU
-	case CPU:
+	switch hw := i.(type) {
+	// CPU
+	case ghw.CPUInfo:
 		// Get cpu info from CPUID
 		cpu := cpuid.CPU
-		fmt.Sprintf("CPU:\t %s\n", cpu.BrandName)
+		model = cpu.BrandName
 		if !cpu.Supports(cpuid.SSE3) {
-			return Unsupported, nil
+			status = Unsupported
 		}
 
 		// If not virtual machine
 		if cpu.VM() {
 			log.Println("Virtual machine %s detected.", cpu.VendorString)
-			return Supported, nil
+			status = Supported
 		} else {
 			if cpu.IsVendor(cpuid.Intel) {
 				if cpu.Family == 6 {
@@ -208,7 +128,7 @@ func Compatibility(info ghw.HostInfo, hw Hardware) (Result, error) {
 					case 141: // Tiger Lake (0x8d)
 					case 165: // Comet Lake (0xa5)
 					case 166: // Comet Lake-L (0xa6)
-						return Supported, nil
+						status = Supported
 					// Xeon
 					case 29: // Penryn (0x1d)
 					case 46: // Nehalem (0x2e)
@@ -217,48 +137,52 @@ func Compatibility(info ghw.HostInfo, hw Hardware) (Result, error) {
 					case 45: // Sandy Bridge-E (0x2d)
 					case 63: // Haswell-E (0x3f)
 					case 85: // Skylake-X/W & Cascade Lake-X/W (0x55)
-						return Warning, nil
+						status = Warning
 					case 28: // Atom (0x1c)
 					case 38: // Atom (0x26)
 					case 54: // Atom (0x36)
 					case 122: // Atom (0x7a)
 					case 134: // Atom (0x86)
-						return Unsupported, nil
+						status = Unsupported
 					default:
-						return Unknown, nil
+						status = Unknown
 					}
 				} else {
-					return Unsupported, nil
+					status = Unsupported
 				}
 			} else if cpu.IsVendor(cpuid.AMD) {
 				// For vanilla, only 15h (Family 21+) and above are supported
 				if cpu.Family >= 21 {
-					return Warning, nil
+					status = Warning
 				} else {
-					return Unsupported, nil
+					status = Unsupported
 				}
 			} else {
-				return Unsupported, nil
+				status = Unsupported
 			}
 		}
-		return Unknown, nil
+		break
+	// Motherboard
+	case ghw.ProductInfo:
+		vendor := strings.Fields(hw.Vendor)[0]
+		status = Supported
+		model = vendor + hw.Name
+		break
 	// Memory
-	case Memory:
-		mem := info.Memory
-		phys := mem.TotalPhysicalBytes
+	case ghw.MemoryInfo:
+		phys := hw.TotalPhysicalBytes
 		size := phys / 1024 / 1024
 		if size < 2048 {
-			fmt.Sprintf("Memory:\t %dMB\n", size)
-			return Unsupported, nil
+			status = Unsupported
 		} else {
-			fmt.Sprintf("Memory:\t %dMB\n", size)
-			return Supported, nil
+			status = Supported
 		}
+		model = fmt.Sprintf("%dMB\n", size)
+		break
 	// Hard Disk
-	case Disk:
-		block := info.Block
-		if len(block.Disks) > 0 {
-			for _, disk := range block.Disks {
+	case ghw.BlockInfo:
+		if len(hw.Disks) > 0 {
+			for _, disk := range hw.Disks {
 				size := disk.SizeBytes / 1024 / 1024 / 1024
 				unitStr := ""
 				if !disk.IsRemovable && disk.DriveType.String() == "HDD" || disk.DriveType.String() == "SSD" {
@@ -269,35 +193,94 @@ func Compatibility(info ghw.HostInfo, hw Hardware) (Result, error) {
 						unitStr = "GB"
 					}
 				}
-				fmt.Sprintf("Disk:\t %s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr)
+				model = fmt.Sprintf("%s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr)
 			}
-			return Supported, nil
+			status = Supported
 		} else {
 			err := fmt.Errorf("Can't find any hard disk\n")
 			log.Fatal(err)
-			return Unknown, err
+			status = Unknown
 		}
-	// GPU
-	case GPU:
-		gpu := info.GPU
-		for _, card := range gpu.GraphicsCards {
+		break
+	// Graphics card
+	case ghw.GPUInfo:
+		for _, card := range hw.GraphicsCards {
 			vendor := strings.Fields(card.DeviceInfo.Vendor.Name)[0]
-			fmt.Sprintf("GPU:\t %s %s\n", vendor, card.DeviceInfo.Product.Name)
+			model = fmt.Sprintf("%s %s\n", vendor, card.DeviceInfo.Product.Name)
 		}
-		return Supported, nil
-	// Ethernet
-	case Ethernet:
-		fmt.Sprintln(pciDev)
-		return Unknown, nil
-	// Wireless
-	case Wireless:
-		fmt.Sprintln(pciDev)
-		return Unknown, nil
-	// Bluetooth
-	case Bluetooth:
-		fmt.Sprintln(pciDev)
-		return Unknown, nil
-	default:
-		return Unknown, nil
+		status = Supported
+		break
+	// PCI device
+	case ghw.PCIInfo:
+		devices := hw.ListDevices()
+		if len(devices) > 0 {
+			for _, device := range devices {
+				// Class 03 = Display controller (GPU), skip
+				devStr := ""
+				vendor := strings.Fields(device.Vendor.Name)[0]
+				if device.Class.ID == "02" { // Network controller
+					if device.Subclass.ID == "00" {
+						devStr = "Ethernet"
+					} else if device.Subclass.ID == "80" {
+						devStr = "Wireless"
+					}
+				} else if device.Class.ID == "04" && device.Subclass.ID == "03" { // Multimedia controller
+					devStr = "Audio"
+				} else if device.Class.ID == "06" && device.Subclass.ID == "01" { // Southbridge
+					model = fmt.Sprintf("Chipest: " + device.String() + "\n")
+				} else if device.Class.ID == "09" { // Input controller
+					if device.Subclass.ID == "00" {
+						devStr = "Keyboard"
+					} else if device.Subclass.ID == "02" {
+						devStr = "Mouse"
+					}
+				} else if device.Class.ID == "0d" && device.Subclass.ID == "80" { // Network controller
+					devStr = "Wireless"
+				}
+				if devStr != "" {
+					model = fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name)
+				}
+			}
+		} else {
+			err := fmt.Errorf("Could not retrieve pci device\n")
+			log.Fatal(err)
+			status = Unknown
+		}
+		break
+	// USB
+	case gousb.Context:
+		ctx := hw
+		defer ctx.Close()
+		devs, _ := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+			if desc.Class == 0x01 && desc.SubClass == 0x01 { // Audio
+				model = fmt.Sprintf("(USB) Audio:\t%s", usbid.Classify(desc))
+			} else if desc.Class == 0x02 && desc.SubClass == 0x06 { // Ethernet network
+				model = fmt.Sprintf("(USB) Ethernet:\t%s", usbid.Classify(desc))
+			} else if desc.Class == 0x0e && desc.SubClass == 0x01 { // Video
+				fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc))
+			} else if desc.Class == 0xe0 && desc.SubClass == 0x01 {
+				if desc.Protocol == 0x01 { // Bluetooth
+					model = fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc))
+				} else if desc.Protocol == 0x02 { // Wireless
+					model = fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc))
+				}
+			}
+			return false
+		})
+
+		for _, dev := range devs {
+			_ = dev
+		}
+
+		defer func() {
+			for _, d := range devs {
+				d.Close()
+			}
+		}()
+
+		break
 	}
+
+	res := Result{model, status}
+	return res
 }

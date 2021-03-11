@@ -7,17 +7,18 @@ import (
 
 type SelectDiskPage struct {
 	*widgets.QWizardPage
-	lv *widgets.QListView
+	lw *widgets.QListWidget
 }
 
 func NewSelectDiskPage(parent widgets.QWidget_ITF) *SelectDiskPage {
-	lv := widgets.NewQListView(nil)
+	lw := widgets.NewQListWidget(nil)
+	lw.SetViewMode(widgets.QListView__IconMode)
 
-	page := &SelectDiskPage{widgets.NewQWizardPage(parent), lv}
+	page := &SelectDiskPage{widgets.NewQWizardPage(parent), lw}
 	page.SetTitle("Select disk")
 
 	layout := widgets.NewQVBoxLayout2(parent)
-	layout.AddWidget(lv, 0, core.Qt__AlignBaseline)
+	layout.AddWidget(lw, 0, core.Qt__AlignBaseline)
 	page.SetLayout(layout)
 
 	return page
