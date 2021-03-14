@@ -52,7 +52,7 @@ const (
 )
 
 type Result struct {
-	Model  string
+	Model  []string
 	Status Status
 }
 
@@ -87,7 +87,7 @@ func Detect() *ghw.HostInfo {
 }
 
 func Compatibility(i interface{}) Result {
-	var model string
+	var model []string
 	status := Unknown
 
 	switch hw := i.(type) {
@@ -95,7 +95,7 @@ func Compatibility(i interface{}) Result {
 	case ghw.CPUInfo:
 		// Get cpu info from CPUID
 		cpu := cpuid.CPU
-		model = cpu.BrandName
+		model = append(model, cpu.BrandName)
 		if !cpu.Supports(cpuid.SSE3) {
 			status = Unsupported
 		}
@@ -166,7 +166,7 @@ func Compatibility(i interface{}) Result {
 	case ghw.ProductInfo:
 		vendor := strings.Fields(hw.Vendor)[0]
 		status = Supported
-		model = vendor + hw.Name
+		model = append(model, vendor+hw.Name)
 		break
 	// Memory
 	case ghw.MemoryInfo:
@@ -177,7 +177,7 @@ func Compatibility(i interface{}) Result {
 		} else {
 			status = Supported
 		}
-		model = fmt.Sprintf("%dMB\n", size)
+		model = append(model, fmt.Sprintf("%dMB\n", size))
 		break
 	// Hard Disk
 	case ghw.BlockInfo:
@@ -193,7 +193,7 @@ func Compatibility(i interface{}) Result {
 						unitStr = "GB"
 					}
 				}
-				model = fmt.Sprintf("%s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr)
+				model = append(model, fmt.Sprintf("%s %s (%s %s, %d%s)\n", disk.Vendor, disk.Model, disk.StorageController.String(), disk.DriveType.String(), size, unitStr))
 			}
 			status = Supported
 		} else {
@@ -206,7 +206,7 @@ func Compatibility(i interface{}) Result {
 	case ghw.GPUInfo:
 		for _, card := range hw.GraphicsCards {
 			vendor := strings.Fields(card.DeviceInfo.Vendor.Name)[0]
-			model = fmt.Sprintf("%s %s\n", vendor, card.DeviceInfo.Product.Name)
+			model = append(model, fmt.Sprintf("%s %s\n", vendor, card.DeviceInfo.Product.Name))
 		}
 		status = Supported
 		break
@@ -216,8 +216,9 @@ func Compatibility(i interface{}) Result {
 		if len(devices) > 0 {
 			for _, device := range devices {
 				// Class 03 = Display controller (GPU), skip
-				devStr := ""
+				var devStr string
 				vendor := strings.Fields(device.Vendor.Name)[0]
+
 				if device.Class.ID == "02" { // Network controller
 					if device.Subclass.ID == "00" {
 						devStr = "Ethernet"
@@ -227,7 +228,7 @@ func Compatibility(i interface{}) Result {
 				} else if device.Class.ID == "04" && device.Subclass.ID == "03" { // Multimedia controller
 					devStr = "Audio"
 				} else if device.Class.ID == "06" && device.Subclass.ID == "01" { // Southbridge
-					model = fmt.Sprintf("Chipest: " + device.String() + "\n")
+					model = append(model, fmt.Sprintf("Chipest: "+device.String()+"\n"))
 				} else if device.Class.ID == "09" { // Input controller
 					if device.Subclass.ID == "00" {
 						devStr = "Keyboard"
@@ -237,8 +238,9 @@ func Compatibility(i interface{}) Result {
 				} else if device.Class.ID == "0d" && device.Subclass.ID == "80" { // Network controller
 					devStr = "Wireless"
 				}
+
 				if devStr != "" {
-					model = fmt.Sprintf("%s:\t %s %s\n", devStr, vendor, device.Product.Name)
+					model = append(model, fmt.Sprintf("%s %s\n", vendor, device.Product.Name))
 				}
 			}
 		} else {
@@ -250,19 +252,26 @@ func Compatibility(i interface{}) Result {
 	// USB
 	case gousb.Context:
 		ctx := hw
+
 		defer ctx.Close()
 		devs, _ := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+			var devStr string
+
 			if desc.Class == 0x01 && desc.SubClass == 0x01 { // Audio
-				model = fmt.Sprintf("(USB) Audio:\t%s", usbid.Classify(desc))
+				devStr = "Audio"
 			} else if desc.Class == 0x02 && desc.SubClass == 0x06 { // Ethernet network
-				model = fmt.Sprintf("(USB) Ethernet:\t%s", usbid.Classify(desc))
+				devStr = "Ethernet"
 			} else if desc.Class == 0x0e && desc.SubClass == 0x01 { // Video
-				fmt.Sprintf("(USB) Video:\t%s", usbid.Classify(desc))
+				devStr = "Video"
 			} else if desc.Class == 0xe0 && desc.SubClass == 0x01 {
 				if desc.Protocol == 0x01 { // Bluetooth
-					model = fmt.Sprintf("(USB) Bluetooth:\t%s\n", usbid.Classify(desc))
+					devStr = "Bluetooth"
 				} else if desc.Protocol == 0x02 { // Wireless
-					model = fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc))
+					devStr = "Wireless"
+				}
+
+				if devStr != "" {
+					model = append(model, fmt.Sprintf("(USB) Wireless:\t%s", usbid.Classify(desc)))
 				}
 			}
 			return false

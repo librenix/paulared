@@ -81,9 +81,21 @@ func (p *DetectPage) Init() {
 			b.SetColor(gui.NewQColor2(core.Qt__gray))
 			break
 		}
-		item := widgets.NewQTreeWidgetItem2([]string{v, model, status}, 0)
-		item.SetForeground(2, b)
-		p.tw.InsertTopLevelItem(k, item)
+
+		// Add items
+		pi := widgets.NewQTreeWidgetItem(0)
+		pi.SetText(0, v)
+		for _, m := range model {
+			item := widgets.NewQTreeWidgetItem2([]string{v, m, status}, 0)
+			item.SetForeground(2, b)
+			if len(model) > 1 {
+				pi.AddChild(item)
+				p.tw.InsertTopLevelItem(k, pi)
+			} else {
+				p.tw.InsertTopLevelItem(k, item)
+			}
+		}
+
 	}
 
 	p.tw.ExpandAll()
